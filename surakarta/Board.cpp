@@ -1,4 +1,5 @@
 #include "Board.h"
+#include "AIGame.h"
 #include <QPainter>
 #include <QPoint>
 #include <QMouseEvent>
@@ -17,7 +18,7 @@ void Board::paintEvent(QPaintEvent *)
 {   //绘制棋盘
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing,true);
-  painter.setPen(QPen(Qt::white, 2));
+    painter.setPen(QPen(Qt::white, 2));
     for (int i = 0; i < BOARD_GRAD_SIZE; i++) {
         painter.drawLine(bianyuan + BLOCK_SIZE * i, bianyuan,
                          bianyuan + BLOCK_SIZE * i,bianyuan+(BOARD_GRAD_SIZE-1)*BLOCK_SIZE);
@@ -70,6 +71,14 @@ void Board::paintEvent(QPaintEvent *)
         drawStone(painter,i) ;
     }
 
+    // 设置点的坐标
+    if(step!=-1){
+    int pointX =bianyuan + BLOCK_SIZE * _s[step]._x;
+    int pointY =bianyuan + BLOCK_SIZE *  _s[step]._y;
+    int pointSize = 5;
+    painter.setPen(QPen(Qt::white, pointSize));
+    painter.drawPoint(pointX, pointY); // 绘制点
+    }
 }
 QPoint Board::center(int x, int y)
 {
@@ -84,6 +93,7 @@ QPoint Board::center(int id)
 }
 void Board::drawStone(QPainter& painter,int id)//画棋子
 {
+
     // 使用RGB值创建自定义颜色
     if(_s[id]._dead)
         return;
@@ -96,7 +106,22 @@ void Board::drawStone(QPainter& painter,int id)//画棋子
         QBrush customBrush(customColor);// 将自定义颜色的画刷应用到绘图工具上
         painter.setBrush(customBrush);}
     if(id==_select)
-    {   QColor customColor(255,255,255);
+    {
+        if(id==_select)
+        {
+            for(int i=0;i<=35;i++)
+            {
+                // 设置发光效果的画笔和画刷
+                painter.setBrush(QColor(250, 244, 240)); // 设置半透明的白色画刷
+                // 绘制一个发光的十字箭头
+                int arrowSize = 7; // 箭头大小
+                // 绘制横线
+                painter.drawRect(bianyuan + BLOCK_SIZE * can_go_x[i] - arrowSize,bianyuan + BLOCK_SIZE *  can_go_y[i] - 2, 2 * arrowSize, 4);
+                // 绘制竖线
+                painter.drawRect(bianyuan + BLOCK_SIZE * can_go_x[i] - 2,bianyuan + BLOCK_SIZE *  can_go_y[i] - arrowSize, 4, 2 * arrowSize);
+            }
+        }
+        QColor customColor(255,255,255);
         QBrush customBrush(customColor);// 将自定义颜色的画刷应用到绘图工具上
         painter.setBrush(customBrush);}
     painter.drawEllipse(center(id),CHESS_SIZE,CHESS_SIZE);
@@ -118,10 +143,46 @@ bool Board::getRowCol(QPoint  pt,int &x,int &y)//判断是否选择成功
     }
     return false;
 }
-void Board::mouseReleaseEvent(QMouseEvent *ev)//选择棋子
+void Board::reliveStone(int id)
 {
-    copyStone(_s_back,_s);
-    QPoint pt=ev->pos();
+    if(id==-1) return;
+    _s[id]._dead = false;
+}
+void Board::killStone(int id)
+{
+    if(id==-1) return;
+    _s[id]._dead = true;
+}
+void Board::moveStone(int moveid, int row, int col)
+{
+    _s[moveid]._x = row;
+    _s[moveid]._y = col;
+    bTurn = !bTurn;
+}
+void Board::saveStep(int moveid, int killid, int row, int col, QVector<Step*>& steps)
+{
+    GetRowCol(row1, col1, moveid);
+    Step* step = new Step;
+    step->_colFrom = col1;
+    step->_colTo = col;
+    step->_rowFrom = row1;
+    step->_rowTo = row;
+    step->_moveid = moveid;
+    step->_killid = killid;
+
+    steps.append(step);
+}
+void Board::moveStone(int moveid, int killid, int row, int col)
+{
+    saveStep(moveid, killid, row, col, _steps);
+
+    killStone(killid);
+    moveStone(moveid, row, col);
+}
+
+void Board::click(QPoint pt)
+{
+
     //将pt转换为坐标
     int x,y;
     bool bRet=getRowCol(pt,x,y);
@@ -129,7 +190,6 @@ void Board::mouseReleaseEvent(QMouseEvent *ev)//选择棋子
         return;
     int i=0;
     int clickid=-1;
-    int GAMEOVER=0;
     int dead1=0,dead2=0;
     for( i=0;i<24;i++)
     {
@@ -156,18 +216,45 @@ void Board::mouseReleaseEvent(QMouseEvent *ev)//选择棋子
         emit sig_finish(false);
         return;
     }
-    if(_select==-1)
+    click(clickid,x,y);
+}
+void Board::click(int clickid, int x, int y){
+    if(clickid!=-1&&bTurn==_s[clickid]._color)
     {
-        if(clickid!=-1)
+
+        int flag=0;
+        for(int i=0;i<=35;i++)//CAN GO TO
         {
-            if(bTurn==_s[clickid]._color)
+            can_go_x[i]=1000;
+            can_go_y[i]=1000;
+
+        }
+        for(int i=0;i<=5;i++)//CAN GO TO
+        {
+            for(int j=0;j<5;j++)
             {
-                _select=clickid;
-                update();
+                int toid=-1;
+                for( int m=0;m<24;m++)
+                {
+                    if(_s[m]._x==i&&_s[m]._y==j&&_s[m]._dead==false)
+                    {
+                        toid=m;
+                        break;
+                    }
+                }
+                if(canMovel(clickid,i,j,toid)==true)
+                {
+                    can_go_x[flag]=i;
+                    can_go_y[flag]=j;
+                    flag++;
+                }
             }
         }
+        _select=clickid;
+        update();
+
     }
-    else
+    else if( _select!=-1)
     {
         if(canMovel(_select,x,y,clickid)==true)
         {
@@ -178,13 +265,42 @@ void Board::mouseReleaseEvent(QMouseEvent *ev)//选择棋子
             {
                 _s[clickid]._dead=true;
             }
+            step=_select;
             _select=-1;
             bTurn=!bTurn;
+            int dead1=0,dead2=0;
+            for(int i=0;i<24;i++)
+            {
+                if(_s[i]._dead==true&&i<12)
+                {
+                    dead1++;
+                }
+                if(_s[i]._dead==true&&i>=12)
+                    dead2++;
+            }
+            if(dead1==12)
+            {
+                emit sig_finish(true);
+                return;
+            }
+
+            if(dead2==12)
+            {
+                emit sig_finish(false);
+                return;
+            }
+
             emit sig_userChanged();
 
             update();
+
         }
     }
+}
+void Board::mouseReleaseEvent(QMouseEvent *ev)//选择棋子
+{
+    copyStone(_s_back,_s);
+    click(ev->pos());
 }
 //save
 //规则
@@ -462,5 +578,4 @@ void Board::init()
     _select=-1;
     bTurn=true;
 }
-
 

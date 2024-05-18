@@ -10,32 +10,32 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    ui->lcdNumber_2->display("10");
-    ui->lcdNumber->display("10");
+    ui->lcdNumber_2->display(QString::number(countdownSecs));
+    ui->lcdNumber->display(QString::number(countdownSecs));
     ui->stackedWidget->setCurrentIndex(0);
-    m_board = new Board(this);
+    m_aigame = new AIGame(this);
     //this->setStyleSheet("QMainWindow {background-color:rgb(7, 9, 4)}");
     this->setStyleSheet("QMainWindow {background-image:url(:/photo/back2.png)}");
     // 设置窗口固定大小
     setFixedSize(700,500); // 设置窗口宽度为800像素，高度为600像素
     // 禁用窗口的大小调整功能
     setWindowFlags(windowFlags() | Qt::MSWindowsFixedSizeDialogHint); // 禁止用户调整窗口大小
-    ui->gridLayout_2->addWidget(m_board);
+    ui->gridLayout_2->addWidget(m_aigame);
 ui->pushButton->setStyleSheet("position: absolute; top: 100px; left: 100px; width: 100px; height: 50px;");
 ui->pushButton_2->setStyleSheet("position:absolute; top: 100px; left: 100px; width: 100px; height: 50px;");
 ui->pushButton_3->setStyleSheet("position: absolute; top: 100px; left:100px; width: 100px; height: 50px;");
 ui->pushButton_4->setStyleSheet("position: absolute; top: 100px; left: 100px; width: 100px; height: 50px;");
     connect(ui->pushButton,&QPushButton::clicked,this,&MainWindow::chooseModel);
-    connect(ui->pushButton_2,&QPushButton::clicked,this,&MainWindow::chooseModel);
-    connect(ui->pushButton_3,&QPushButton::clicked,this,&MainWindow::chooseModel);
-    connect(ui->pushButton_4,&QPushButton::clicked,this,&MainWindow::chooseModel);
+    connect(ui->pushButton_2,&QPushButton::clicked,this,&MainWindow::chooseModel_2);
+    connect(ui->pushButton_3,&QPushButton::clicked,this,&MainWindow::chooseModel_3);
+    connect(ui->pushButton_4,&QPushButton::clicked,this,&MainWindow::chooseModel_4);
     connect(ui->loseBtn_1,&QPushButton::clicked,this,&MainWindow::slot_endGameBox);
     connect(ui->loseBtn_2,&QPushButton::clicked,this,&MainWindow::slot_endGameBox);
     connect(ui->undoBtn_1,&QPushButton::clicked,this,&MainWindow::undo);
     connect(ui->undoBtn_2,&QPushButton::clicked,this,&MainWindow::undo);
     connect(&gamePlayTimer,&QTimer::timeout,this,&MainWindow::gamePlayTimeout);
-    connect(m_board,&Board::sig_userChanged,this,&MainWindow::userChanged);
-    connect(m_board,&Board::sig_finish,[=](bool user1){
+    connect(m_aigame,&Board::sig_userChanged,this,&MainWindow::userChanged);
+    connect(m_aigame,&Board::sig_finish,[=](bool user1){
         QString msg;
         if(user1){
             msg = "用户1输了\n游戏结束，您想要做什么？";
@@ -53,7 +53,25 @@ MainWindow::~MainWindow()
 
 void MainWindow::chooseModel()
 {
+    qDebug() << "enter human vs AI";
+    this->m_aigame->ai_mode[0] = false;
+    this->m_aigame->ai_mode[1] = false;
     //此处应该切换到不同界面，等stage3联网做完再实现
+    ui->stackedWidget->setCurrentIndex(1);
+}
+
+void MainWindow::chooseModel_2() {
+    qDebug() << "enter human vs human";
+    this->m_aigame->ai_mode[0] = false;
+    this->m_aigame->ai_mode[1] = true;
+    ui->stackedWidget->setCurrentIndex(1);
+}
+
+void MainWindow::chooseModel_3() {
+    ui->stackedWidget->setCurrentIndex(1);
+}
+
+void MainWindow::chooseModel_4() {
     ui->stackedWidget->setCurrentIndex(1);
 }
 
@@ -72,7 +90,7 @@ void MainWindow::slot_endGameBox()
 void MainWindow::undo()
 {
     //悔棋
-    m_board->undo();
+    m_aigame->undo();
 }
 
 
@@ -83,32 +101,32 @@ void MainWindow::userChanged()
     if(!gamePlayTimer.isActive())
         gamePlayTimer.start(1*1000);
 
-    if(m_board->getUser1()){
-        user2Count = 10;
+    if(m_aigame->getUser1()){
+        user2Count = countdownSecs;
     }else {
-        user1Count = 10;
+        user1Count = countdownSecs;
     }
 
 }
 
 void MainWindow::reset()
 {
-    m_board->reset();
-    ui->lcdNumber_2->display("10");
-    ui->lcdNumber->display("10");
-    user1Count = 10;
-    user2Count = 10;
+    m_aigame->reset();
+    ui->lcdNumber_2->display(QString::number(countdownSecs));
+    ui->lcdNumber->display(QString::number(countdownSecs));
+    user1Count = countdownSecs;
+    user2Count = countdownSecs;
 }
 
 void MainWindow::gamePlayTimeout()
 {
-    if(m_board->getUser1()){
+    if(m_aigame->getUser1()){
         user1Count -=1;
-        ui->lcdNumber_2->display("10");
+        ui->lcdNumber_2->display(QString::number(countdownSecs));
         ui->lcdNumber->display(user1Count);
     }else {
         user2Count -=1;
-        ui->lcdNumber->display("10");
+        ui->lcdNumber->display(QString::number(countdownSecs));
         ui->lcdNumber_2->display(user2Count);
     }
 
